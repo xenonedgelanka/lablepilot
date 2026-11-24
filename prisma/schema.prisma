@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+  active       Boolean  @default(true)
+  @@map("admins")
+}
+
+model BusinessProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String
+  registrationNumber String?  @map("registration_number")
+  address            String?
+  phone              String?
+  whatsapp           String?
+  email              String?
+  website            String?
+  logoUrl            String?  @map("logo_url")
+  description        String?
+  deletedAt          DateTime? @map("deleted_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  @@map("business_profiles")
+}
+
+model Category {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  products  Product[]
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  @@map("categories")
+}
+
+model Product {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  sku         String         @unique
+  categoryId  String?        @db.Uuid @map("category_id")
+  category    Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand       String?
+  imageUrl    String?        @map("image_url")
+  description String?
+  weight      Decimal?       @db.Decimal(12, 3)
+  weightUnit  String?        @map("weight_unit")
+  ingredients String?
+  status      String         @default("active")
+  barcode     Barcode?
+  batches     ProductBatch[]
+  prices      ProductPrice[]
+  deletedAt   DateTime?      @map("deleted_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  @@index([categoryId])
+  @@index([name])
+  @@map("products")
+}
+
+model ProductBatch {
+  id                String   @id @default(uuid()) @db.Uuid
+  productId         String   @db.Uuid @map("product_id")
+  product           Product  @relation(fields: [productId], references: [id])
+  batchNumber       String   @map("batch_number")
+  manufacturingDate DateTime? @db.Date @map("manufacturing_date")
+  expiryDate        DateTime? @db.Date @map("expiry_date")
+  productionQuantity Int     @default(0) @map("production_quantity")
+  remainingQuantity Int?     @map("remaining_quantity")
+  status            String   @default("active")
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  printItems        PrintJobItem[]
+  @@unique([productId, batchNumber])
+  @@index([expiryDate])
+  @@map("product_batches")
+}
+
+model Barcode {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @unique @db.Uuid @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id])
+  value       String   @unique
+  format      String   @default("CODE128")
+  allocatedAt DateTime @default(now()) @map("allocated_at")
+  @@map("barcodes")
+}
+
+model Currency {
+  code      String         @id @db.VarChar(3)
+  name      String
+  symbol    String
+  enabled   Boolean        @default(true)
+  prices    ProductPrice[]
+  histories PriceHistory[]
+  @@map("currencies")
+}
+
+model ProductPrice {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  currencyCode String @db.VarChar(3) @map("currency_code")
+  currency  Currency @relation(fields: [currencyCode], references: [code])
+  type      String
+  amount    Decimal  @db.Decimal(14, 2)
+  history   PriceHistory[]
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([productId, currencyCode, type])
+  @@map("product_prices")
+}
+
+model PriceHistory {
+  id             String   @id @default(uuid()) @db.Uuid
+  productId      String   @db.Uuid @map("product_id")
+  priceId        String   @db.Uuid @map("price_id")
+  price          ProductPrice @relation(fields: [priceId], references: [id])
+  currencyCode   String   @db.VarChar(3) @map("currency_code")
+  currency       Currency @relation(fields: [currencyCode], references: [code])
+  type           String
+  oldAmount      Decimal? @db.Decimal(14, 2) @map("old_amount")
+  newAmount      Decimal  @db.Decimal(14, 2) @map("new_amount")
+  changedAt      DateTime @default(now()) @map("changed_at")
+  @@index([productId, changedAt])
+  @@map("price_history")
+}
+
+model LabelTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  widthMm   Decimal  @db.Decimal(7, 2) @map("width_mm")
+  heightMm  Decimal  @db.Decimal(7, 2) @map("height_mm")
+  config    Json
+  isDefault Boolean  @default(false) @map("is_default")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("label_templates")
+}
+
+model PrintJob {
+  id           String         @id @default(uuid()) @db.Uuid
+  status       String         @default("queued")
+  currencyCode String         @default("LKR") @map("currency_code")
+  priceType    String         @default("retail") @map("price_type")
+  printedAt    DateTime?      @map("printed_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  items        PrintJobItem[]
+  @@map("print_jobs")
+}
+
+model PrintJobItem {
+  id        String        @id @default(uuid()) @db.Uuid
+  jobId     String        @db.Uuid @map("job_id")
+  job       PrintJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  batchId   String?       @db.Uuid @map("batch_id")
+  batch     ProductBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  productId String        @db.Uuid @map("product_id")
+  quantity  Int           @default(1)
+  @@index([productId])
+  @@map("print_job_items")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  action     String
+  entity     String
+  entityId   String?  @map("entity_id")
+  detail     Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

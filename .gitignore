@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.*.local
+*.tsbuildinfo
+coverage/
+tmp/
+scripts/reset-local-postgres.ps1
